@@ -44,7 +44,7 @@ namespace miopen {
 template <class T, std::size_t... Ns>
 auto tie_impl(T&& x, detail::seq<Ns...>) -> decltype(std::tie(x[Ns]...))
 {
-    assert(x.size() == sizeof...(Ns));
+    assert(x.size() >= sizeof...(Ns));
     return std::tie(x[Ns]...);
 }
 
