@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 ARG USE_MLIR="OFF"
 
@@ -33,6 +33,10 @@ wget -q -O - https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - && \
 apt-get update && \
 DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
     build-essential \
+    vim \
+    ninja-build \
+    mc \
+    fish \
     cmake \
     comgr \
     clang-format-10 \
@@ -48,11 +52,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
     llvm-amdgpu \
     miopengemm \
     pkg-config \
-    python \
     python3 \
-    python-dev \
     python3-dev \
-    python-pip \
     python3-pip \
     python3-distutils \
     python3-venv \
@@ -86,8 +87,8 @@ RUN pip3 install https://github.com/RadeonOpenCompute/rbuild/archive/6d78a0553ba
 # Add symlink to /opt/rocm
 RUN [ -d /opt/rocm ] || ln -sd $(realpath /opt/rocm-*) /opt/rocm
 
-# Make sure /opt/rcom is in the paths
-ENV PATH="/opt/rocm:${PATH}"
+# Make sure /opt/rocm/bin is in the PATH
+ENV PATH="/opt/rocm/bin:${PATH}"
 
 # Add requirements files
 ADD rbuild.ini /rbuild.ini
@@ -128,4 +129,53 @@ RUN if [ "$USE_TARGETID" = "ON" ] ; then export HIPCC_LINK_FLAGS_APPEND='-O3 -pa
 ARG MIOTENSILE_VER="default"
 RUN if [ "$USE_TARGETID" = "OFF" ] ; then echo "MIOpenTensile is not installed."; elif [ "$MIOTENSILE_VER" = "latest" ] ; then cget -p $PREFIX install ROCmSoftwarePlatform/MIOpenTensile@94a9047741d16a8eccd290131b78fb1aa69cdcdf; else cget -p $PREFIX install ROCmSoftwarePlatform/MIOpenTensile@94a9047741d16a8eccd290131b78fb1aa69cdcdf; fi
 
-RUN groupadd -f render
+RUN apt-get update && \
+DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+    openssh-server \
+    sudo && \
+    apt-get remove -y rocm-cmake && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Update of pip is often requested during the packages installation,
+# so we do it here
+python3 -m pip install --upgrade pip setuptools
+
+# Grant members of 'sudo' group passwordless privileges
+COPY sudo-nopasswd /etc/sudoers.d/sudo-nopasswd
+
+# Include /opt/rocm/bin to the PATH for fish shell
+RUN echo "set -gx PATH /opt/rocm/bin $PATH" >> /etc/fish/config.fish
+
+# Run basic ROCm compatibility check against the available hardware
+COPY rocm-compatibility-check.sh rocm-compatibility-test.sh
+
+ENV ID "${ID}"
+
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+RUN mkdir /var/run/sshd
+RUN bash -c 'install -m755 <(printf "#!/bin/sh\nexit 0") /usr/sbin/policy-rc.d'
+RUN ex +'%s/^#\zeListenAddress/\1/g' -scwq /etc/ssh/sshd_config
+RUN ex +'%s/^#\zeHostKey .*ssh_host_.*_key/\1/g' -scwq /etc/ssh/sshd_config
+RUN RUNLEVEL=1 dpkg-reconfigure openssh-server
+RUN ssh-keygen -A -v
+RUN update-rc.d ssh defaults
+
+# TODO modules
+# git clone https://github.com/cea-hpc/modules.git
+# cd modules
+# sudo apt install tcl tcl-dev autoconf
+# ./configure
+# make -j4
+# sudo make install
+
+# Entrypoint is used to create a user with uid/gid and groups matching the host system
+COPY entrypoint.pl /entrypoint.pl
+RUN chmod +x /entrypoint.pl
+ENTRYPOINT ["/entrypoint.pl"]
+
+# Start SSH server
+EXPOSE 22
+CMD ["/usr/bin/sudo", "/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0"]
+
