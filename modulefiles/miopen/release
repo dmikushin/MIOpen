@@ -1,0 +1,11 @@
+#%Module
+
+proc ModulesHelp { } {
+   puts stderr "This module adds release version of AMD MIOpen library"
+}
+
+module-whatis "This module adds release version of AMD MIOpen library\n"
+
+set basedir "/home/marcusmae/amd/MIOpen_build/install"
+prepend-path PATH "${basedir}/bin"
+prepend-path LD_LIBRARY_PATH "${basedir}/lib"
