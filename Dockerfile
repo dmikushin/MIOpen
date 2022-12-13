@@ -8,7 +8,7 @@ RUN dpkg --add-architecture i386
 # Add rocm repository
 # Note: The ROCm version with $USE_MLIR should keep in sync with default ROCm version
 # unless MLIR library is incompatible with current ROCm.
-
+# TODO Remove
 RUN if [ "$USE_MLIR" = "ON" ] ; \
         then export ROCM_APT_VER=.apt_5.1;\
     else \
@@ -18,7 +18,7 @@ echo $ROCM_APT_VER &&\
 sh -c 'echo deb [arch=amd64 trusted=yes] http://repo.radeon.com/rocm/apt/$ROCM_APT_VER/ ubuntu main > /etc/apt/sources.list.d/rocm.list'
 RUN sh -c "echo deb http://mirrors.kernel.org/ubuntu bionic main universe | tee -a /etc/apt/sources.list"
 
-#Add gpg keys
+# Add gpg keys
 # Install dependencies
 RUN apt-get update && \
 DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
@@ -133,13 +133,12 @@ RUN apt-get update && \
 DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
     openssh-server \
     sudo && \
-    apt-get remove -y rocm-cmake && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Update of pip is often requested during the packages installation,
 # so we do it here
-python3 -m pip install --upgrade pip setuptools
+RUN python3 -m pip install --upgrade pip setuptools
 
 # Grant members of 'sudo' group passwordless privileges
 COPY sudo-nopasswd /etc/sudoers.d/sudo-nopasswd
@@ -148,9 +147,7 @@ COPY sudo-nopasswd /etc/sudoers.d/sudo-nopasswd
 RUN echo "set -gx PATH /opt/rocm/bin $PATH" >> /etc/fish/config.fish
 
 # Run basic ROCm compatibility check against the available hardware
-COPY rocm-compatibility-check.sh rocm-compatibility-test.sh
-
-ENV ID "${ID}"
+COPY rocm-compatibility-check.sh /rocm-compatibility-check.sh
 
 # SSH login fix. Otherwise user is kicked off after login
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
@@ -162,13 +159,21 @@ RUN RUNLEVEL=1 dpkg-reconfigure openssh-server
 RUN ssh-keygen -A -v
 RUN update-rc.d ssh defaults
 
-# TODO modules
-# git clone https://github.com/cea-hpc/modules.git
-# cd modules
-# sudo apt install tcl tcl-dev autoconf
-# ./configure
-# make -j4
-# sudo make install
+RUN apt-get update && \
+DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+    tcl tcl-dev \
+    autoconf && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install modules to quickly switch between different versions of MIOpen
+RUN git clone https://github.com/cea-hpc/modules.git && \
+    cd modules && \
+    ./configure && \
+    make -j4 && \
+    make install
+
+ENV ID "${ID}"
 
 # Entrypoint is used to create a user with uid/gid and groups matching the host system
 COPY entrypoint.pl /entrypoint.pl

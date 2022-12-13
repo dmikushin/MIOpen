@@ -1,5 +1,15 @@
 #!/usr/bin/perl -w
 
+# This script aims to reproduce the exact user and group settings of the host machine.
+#
+# This is done this way for the following reason:
+#
+# Although Docker provides "user" and "group_add" options to assign uid and gid
+# to the containerized user, they are applied at the moment when the host username
+# is not yet known. It means, we cannot map an arbitrary host username to the container,
+# and match its home directory, which will result into mismatching absolute paths cached
+# in e.g. CMake.
+# 
 # We expect the id to be provided via ID environment variable:
 # docker run --env ID=\"$(id)\" ...
 #
@@ -86,7 +96,7 @@ else
 	system("useradd $create_home --gid $gid --uid $uid -G $groups_csv --shell /usr/bin/fish $uid_user");
 }
 
-system("bash rocm-compatibility-test.sh");
+system("bash rocm-compatibility-check.sh");
 
 my(@args) = ("sudo", "-i", "-u", "$uid_user", @ARGV);
 exec { $args[0] } @args;
