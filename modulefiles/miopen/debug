@@ -6,6 +6,6 @@ proc ModulesHelp { } {
  
 module-whatis "This module adds debug version of AMD MIOpen library\n"
 
-set basedir "/home/marcusmae/amd/MIOpen_build_debug/install"
+set basedir "$HOME/amd/MIOpen_build_debug/install"
 prepend-path PATH "${basedir}/bin"
 prepend-path LD_LIBRARY_PATH "${basedir}/lib"
