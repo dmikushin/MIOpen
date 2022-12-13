@@ -1,0 +1,26 @@
+version: '2.4'
+
+services:
+  miopen-image:
+    image: miopen-image:rocm-5.3.2
+    hostname: miopen
+    environment:
+      - ID=${ID}
+    privileged: true
+    security_opt:
+      - "seccomp:unconfined"
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - /dev/dri:/dev/dri:rw
+      - /var/lib/docker/:/var/lib/docker
+      - $HOME:$HOME
+      - ./known_hosts:$HOME/.ssh/known_hosts
+      - ./fish:$HOME/.config/fish
+    devices:
+      - /dev/kfd
+      - /dev/dri:/dev/dri:rw
+    cap_add:
+      - SYS_PTRACE
+    ports:
+      - "127.0.0.1:2222:22"

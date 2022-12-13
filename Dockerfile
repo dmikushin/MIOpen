@@ -1,4 +1,5 @@
 FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND noninteractive
 
 ARG USE_MLIR="OFF"
 
@@ -27,11 +28,13 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
     curl \
     libnuma-dev \
     gnupg \
-    apt-utils && \
+    apt-utils \
+    software-properties-common && \
+apt-add-repository ppa:fish-shell/release-3 && \
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 9386B48A1A693C5C && \
 wget -q -O - https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - && \
 apt-get update && \
-DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+    apt-get install -y --allow-unauthenticated \
     build-essential \
     vim \
     ninja-build \
@@ -172,6 +175,9 @@ RUN git clone https://github.com/cea-hpc/modules.git && \
     ./configure && \
     make -j4 && \
     make install
+
+# Integrate modules into fish shell
+RUN echo "source /usr/local/Modules/init/fish" >> /etc/fish/config.fish
 
 ENV ID "${ID}"
 
